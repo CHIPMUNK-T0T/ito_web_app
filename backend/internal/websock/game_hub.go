@@ -1,0 +1,86 @@
+package websock
+
+import (
+	"CHIPMUNK-T0T/ito_web_app/internal/entity/domain"
+	"sync"
+)
+
+type GameHub struct {
+	Clients    map[*Client]bool
+	Register   chan *Client
+	Unregister chan *Client
+	Broadcast  chan []byte
+	Games      map[uint]*domain.Game
+	mu         sync.RWMutex
+	messageHandler GameMessageHandler
+}
+
+func NewGameHub() *GameHub {
+	return &GameHub{
+		Clients:    make(map[*Client]bool),
+		Register:   make(chan *Client),
+		Unregister: make(chan *Client),
+		Broadcast:  make(chan []byte),
+		Games:      make(map[uint]*domain.Game),
+	}
+}
+
+func (h *GameHub) Run() {
+	for {
+		select {
+		case client := <-h.Register:
+			h.Clients[client] = true
+		case client := <-h.Unregister:
+			if _, ok := h.Clients[client]; ok {
+				delete(h.Clients, client)
+				close(client.Send)
+			}
+		case message := <-h.Broadcast:
+			for client := range h.Clients {
+				select {
+				case client.Send <- message:
+				default:
+					close(client.Send)
+					delete(h.Clients, client)
+				}
+			}
+		}
+	}
+}
+
+func (h *GameHub) BroadcastToRoom(roomID uint, message []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for client := range h.Clients {
+		if client.RoomID == roomID {
+			select {
+			case client.Send <- message:
+			default:
+				close(client.Send)
+				delete(h.Clients, client)
+			}
+		}
+	}
+}
+
+func (h *GameHub) SendToUser(userID uint, message []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for client := range h.Clients {
+		if client.UserID == userID {
+			select {
+			case client.Send <- message:
+			default:
+				close(client.Send)
+				delete(h.Clients, client)
+			}
+			return
+		}
+	}
+}
+
+func (h *GameHub) RegisterMessageHandler(handler GameMessageHandler) {
+	h.messageHandler = handler
+} 
