@@ -13,8 +13,6 @@ func sub() {
 	}
 
 
-	userRep := repository.NewUserRepository(db)
+	_ = repository.NewUserRepository(db)
 
-
-	return
 }

@@ -23,6 +23,17 @@ type Client struct {
 	messageHandler *MessageHandler
 }
 
+func NewClient(hub *GameHub, conn *websocket.Conn, userID, roomID uint) *Client {
+	return &Client{
+		Hub:            hub,
+		Conn:           conn,
+		Send:           make(chan []byte, 256),
+		UserID:         userID,
+		RoomID:         roomID,
+		messageHandler: hub.messageHandler,
+	}
+}
+
 func (c *Client) ReadPump() {
 	defer func() {
 		c.Hub.Unregister <- c
@@ -45,8 +56,13 @@ func (c *Client) ReadPump() {
 			break
 		}
 
-		if err := c.messageHandler.HandleMessage(c, message); err != nil {
-			log.Printf("error handling message: %v", err)
+		handler := c.Hub.MessageHandler()
+		if handler != nil {
+			if err := handler.HandleMessage(c, message); err != nil {
+				log.Printf("error handling message: %v", err)
+			}
+		} else {
+			log.Printf("error: message handler is not registered")
 		}
 	}
 }
@@ -83,4 +99,4 @@ func (c *Client) WritePump() {
 			}
 		}
 	}
-} 
+}

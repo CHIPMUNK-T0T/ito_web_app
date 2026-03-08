@@ -54,51 +54,63 @@ func NewRoomWithID(id uint, name string, passwordHash functional.Hash, maxPlayer
 	}
 }
 
-func (r *Room) ID() uint {
+func (r Room) ID() uint {
 	return r.id
 }
 
-func (r *Room) Name() string {
+func (r *Room) SetID(id uint) {
+	r.id = id
+}
+
+func (r Room) Name() string {
 	return r.name
 }
 
-func (r *Room) Password() functional.Hash {
+func (r Room) Password() functional.Hash {
 	return r.password
 }
 
-func (r *Room) MaxPlayers() int {
+func (r Room) MaxPlayers() int {
 	return r.maxPlayers
 }
 
-func (r *Room) CreatorID() uint {
+func (r Room) CreatorID() uint {
 	return r.creatorID
 }
 
-func (r *Room) Description() string {
+func (r Room) Description() string {
 	return r.description
 }
 
-func (r *Room) IsPrivate() bool {
+func (r Room) IsPrivate() bool {
 	return r.isPrivate
 }
 
-func (r *Room) IsFull() bool {
+func (r Room) IsFull() bool {
 	return len(r.players) >= r.maxPlayers
 }
 
-func (r *Room) GetPlayerCount() int {
+func (r Room) GetPlayerCount() int {
 	return len(r.players)
 }
 
-func (r *Room) GetPlayers() []RoomPlayer {
-	return r.players
+func (r *Room) LoadPlayers(players []RoomPlayer) {
+	r.players = players
 }
 
-func (r *Room) GetStatus() entity.RoomStatus {
+func (r *Room) GetPlayers() []*RoomPlayer {
+	players := make([]*RoomPlayer, len(r.players))
+	for i := range r.players {
+		players[i] = &r.players[i]
+	}
+	return players
+}
+
+func (r Room) GetStatus() entity.RoomStatus {
 	return r.status
 }
 
-func (r *Room) ValidatePassword(password string) bool {
+func (r Room) ValidatePassword(password string) bool {
 	return r.password.Validate(password)
 }
 
@@ -129,13 +141,29 @@ func (r *Room) AddPlayer(user User) bool {
 }
 
 func (r *Room) RemovePlayer(userID uint) bool {
+	index := -1
 	for i, player := range r.players {
 		if player.user.ID() == userID {
-			r.players = append(r.players[:i], r.players[i+1:]...)
-			return true
+			index = i
+			break
 		}
 	}
-	return false
+
+	if index == -1 {
+		return false
+	}
+
+	// 削除実行
+	r.players = append(r.players[:index], r.players[index+1:]...)
+
+	// もし削除されたのがホスト（creatorID）だった場合、新しいホストを任命
+	if r.creatorID == userID && len(r.players) > 0 {
+		newHost := &r.players[0]
+		r.creatorID = newHost.user.ID()
+		newHost.role = entity.Host
+	}
+
+	return true
 }
 
 func (r *Room) GetCreatorID() uint {
@@ -168,7 +196,7 @@ func NewRoomPlayer(user User, role entity.Role) RoomPlayer {
 	}
 }
 
-func (r *RoomPlayer) User() User {
+func (r RoomPlayer) User() User {
 	return r.user
 }
 

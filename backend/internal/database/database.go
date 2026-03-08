@@ -15,20 +15,15 @@ func NewDB_SQLite() (*gorm.DB, error) {
 		return nil, fmt.Errorf("データベース接続エラー: %v", err)
 	}
 
-	// // 既存のテーブルを削除（開発環境でのみ使用することを推奨）
-	// err = db.Migrator().DropTable(&model.User{}, &model.Room{}, &model.RoomUser{})
-	// if err != nil {
-	// 	return nil, fmt.Errorf("テーブル削除エラー: %v", err)
-	// }
-
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("コネクションプール取得エラー: %v", err)
 	}
 
 	// コネクションプールの設定
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
+	// SQLite はデフォルトで単一書き込みのため、1 に制限することでロック競合を防ぐ
+	sqlDB.SetMaxIdleConns(1)
+	sqlDB.SetMaxOpenConns(1)
 
 	log.Println("データベース接続成功")
 	return db, nil
@@ -36,9 +31,11 @@ func NewDB_SQLite() (*gorm.DB, error) {
 
 func AutoMigrate(db *gorm.DB) error {
 	// モデルの自動マイグレーション
+	// ゲームの進行状況（GameSession, Hand）はメモリ管理にするため、DBからは除外
 	return db.AutoMigrate(
 		&model.User{},
 		&model.Room{},
+		&model.Theme{},
 	)
 }
 
@@ -49,4 +46,3 @@ func GetTableNames(db *gorm.DB) ([]string, error) {
 	}
 	return tables, nil
 }
-

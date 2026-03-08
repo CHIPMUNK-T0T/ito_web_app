@@ -1,8 +1,11 @@
 package router
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -55,8 +58,16 @@ func (r *Router) StartGame(c *gin.Context) {
 		return
 	}
 
+	var req struct {
+		Theme string `json:"theme"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "リクエストの形式が不正です"})
+		return
+	}
+
 	// ゲーム開始
-	if err := r.gameUseCase.StartGame(uint(roomID)); err != nil {
+	if err := r.gameUseCase.StartGame(uint(roomID), strings.TrimSpace(req.Theme)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -64,33 +75,33 @@ func (r *Router) StartGame(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "ゲームを開始しました"})
 }
 
-func (r *Router) InitiateVote(c *gin.Context) {
+func (r *Router) RefreshDeck(c *gin.Context) {
 	roomID, err := strconv.ParseUint(c.Param("roomId"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "無効なルームID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "無効なルームIDです"})
 		return
 	}
 
-	var req struct {
-		UserID uint `json:"user_id" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "無効なリクエスト"})
-		return
-	}
-
-	game, err := r.gameUseCase.GetGameByRoomID(uint(roomID))
+	// ルームの存在確認
+	room, err := r.roomUseCase.GetRoom(uint(roomID))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ゲームが見つかりません"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "ルームが見つかりません"})
 		return
 	}
 
-	if err := r.gameUseCase.InitiateVote(game, req.UserID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// 権限チェック
+	userID := c.GetUint("user_id")
+	if room.GetCreatorID() != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "リフレッシュする権限がありません"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "投票を開始しました"})
+	if err := r.gameUseCase.RefreshDeck(uint(roomID)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "山札のリフレッシュに失敗しました"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "山札をリフレッシュしました"})
 }
 
 func (r *Router) GetGameStatus(c *gin.Context) {
@@ -117,13 +128,16 @@ func (r *Router) HandleWebSocket(c *gin.Context) {
 	// ユーザー認証の確認
 	userID := c.GetUint("user_id")
 	if userID == 0 {
+		r.logger.Error("HandleWebSocket: 認証失敗", "userID", userID)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "認証が必要です"})
 		return
 	}
 
 	// ルームIDの取得と検証
-	roomID, err := strconv.ParseUint(c.Param("roomId"), 10, 64)
+	roomIDStr := c.Param("roomId")
+	roomID, err := strconv.ParseUint(roomIDStr, 10, 64)
 	if err != nil {
+		r.logger.Error("HandleWebSocket: 無効なルームID", "roomIDStr", roomIDStr, "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "無効なルームIDです"})
 		return
 	}
@@ -131,12 +145,19 @@ func (r *Router) HandleWebSocket(c *gin.Context) {
 	// ルームの存在確認
 	room, err := r.roomUseCase.GetRoom(uint(roomID))
 	if err != nil {
+		r.logger.Error("HandleWebSocket: ルームが見つかりません", "roomID", roomID, "error", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "ルームが見つかりません"})
 		return
 	}
 
 	// ユーザーがルームに所属しているか確認
 	if !room.HasPlayer(userID) {
+		players := room.GetPlayers()
+		pIDs := make([]uint, 0, len(players))
+		for _, p := range players {
+			pIDs = append(pIDs, p.User().ID())
+		}
+		r.logger.Error("HandleWebSocket: ルームに参加していません", "userID", userID, "roomID", roomID, "players", pIDs)
 		c.JSON(http.StatusForbidden, gin.H{"error": "このルームに参加していません"})
 		return
 	}
@@ -147,7 +168,7 @@ func (r *Router) HandleWebSocket(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "WebSocket接続に失敗しました"})
 		return
 	}
-	defer conn.Close()
+	// defer conn.Close() は削除: HandlePlayerConnection 内で管理する
 
 	// WebSocket接続の確立を通知
 	if err := conn.WriteJSON(gin.H{
@@ -157,6 +178,7 @@ func (r *Router) HandleWebSocket(c *gin.Context) {
 			"room_id": roomID,
 		},
 	}); err != nil {
+		conn.Close()
 		return
 	}
 
@@ -166,6 +188,7 @@ func (r *Router) HandleWebSocket(c *gin.Context) {
 			"type":  "error",
 			"error": err.Error(),
 		})
+		conn.Close()
 		return
 	}
-} 
+}

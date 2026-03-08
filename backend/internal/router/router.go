@@ -40,8 +40,19 @@ func (r *Router) SetupRoutes(e *gin.Engine) {
 		secured.Use(middleware.AuthMiddleware())
 		{
 			r.setupRoomRoutes(secured)
-			r.setupGameRoutes(secured)
+			
+			games := secured.Group("/games")
+			{
+				games.POST("/:roomId/ready", r.SetPlayerReady)
+				games.POST("/:roomId/start", r.StartGame)
+				games.POST("/:roomId/refresh", r.RefreshDeck)
+				games.GET("/:roomId/status", r.GetGameStatus)
+			}
 		}
+
+		// WebSocket 用の特別な認証 (クエリパラメータ ?token= を許可)
+		// /api/ws/:roomId
+		api.GET("/ws/:roomId", middleware.AuthMiddlewareWS(), r.HandleWebSocket)
 	}
 }
 
@@ -52,16 +63,5 @@ func (r *Router) setupRoomRoutes(rg *gin.RouterGroup) {
 		rooms.POST("", r.validateCreateRoom, r.CreateRoom)
 		rooms.GET("/:id", r.GetRoom)
 		rooms.POST("/:id/join", r.validateJoinRoom, r.JoinRoom)
-	}
-}
-
-func (r *Router) setupGameRoutes(rg *gin.RouterGroup) {
-	games := rg.Group("/games")
-	{
-		games.POST("/:roomId/ready", r.SetPlayerReady)
-		games.POST("/:roomId/start", r.StartGame)
-		games.POST("/:roomId/vote", r.InitiateVote)
-		games.GET("/:roomId/status", r.GetGameStatus)
-		games.GET("/ws/:roomId", r.HandleWebSocket)
 	}
 }

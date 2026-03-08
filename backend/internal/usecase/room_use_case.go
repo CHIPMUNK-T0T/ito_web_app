@@ -37,7 +37,7 @@ func (uc *RoomUseCase) CreateRoom(name, password string, maxPlayers int, creator
 		return nil, err
 	}
 
-	err = uc.roomRepo.Create(room)
+	err = uc.roomRepo.Create(&room)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +51,11 @@ func (uc *RoomUseCase) JoinRoom(roomID uint, password string) (*domain.Room, err
 		return nil, errors.New("ルームが見つかりません")
 	}
 
-	if !room.ValidatePassword(password) {
-		return nil, errors.New("パスワードが一致しません")
+	// プライベートルームのみパスワードを検証する
+	if room.IsPrivate() {
+		if !room.ValidatePassword(password) {
+			return nil, errors.New("パスワードが一致しません")
+		}
 	}
 
 	return &room, nil
@@ -77,7 +80,7 @@ func (uc *RoomUseCase) AddPlayer(roomID, userID uint) error {
 		return errors.New("プレイヤーの追加に失敗しました")
 	}
 
-	return uc.roomRepo.Update(room)
+	return uc.roomRepo.Update(&room)
 }
 
 func (uc *RoomUseCase) RemovePlayer(roomID uint, userID uint) error {
@@ -90,7 +93,7 @@ func (uc *RoomUseCase) RemovePlayer(roomID uint, userID uint) error {
 		return errors.New("プレイヤーの削除に失敗しました")
 	}
 
-	return uc.roomRepo.Update(room)
+	return uc.roomRepo.Update(&room)
 }
 
 func (uc *RoomUseCase) SetPlayerReady(roomID uint, userID uint, isReady bool) error {
@@ -104,7 +107,7 @@ func (uc *RoomUseCase) SetPlayerReady(roomID uint, userID uint, isReady bool) er
 		user := players[i].User()
 		if user.ID() == userID {
 			players[i].SetIsReady(isReady)
-			return uc.roomRepo.Update(room)
+			return uc.roomRepo.Update(&room)
 		}
 	}
 
@@ -120,5 +123,16 @@ func (uc *RoomUseCase) GetRoom(roomID uint) (*domain.Room, error) {
 }
 
 func (uc *RoomUseCase) GetAllRooms() ([]domain.Room, error) {
-	return uc.roomRepo.FindAll()
+	allRooms, err := uc.roomRepo.FindAll()
+	if err != nil {
+		return nil, err
+	}
+	// プライベートルームは一覧から除外する（URLを知っている人のみ参加可能）
+	public := make([]domain.Room, 0, len(allRooms))
+	for _, room := range allRooms {
+		if !room.IsPrivate() {
+			public = append(public, room)
+		}
+	}
+	return public, nil
 } 

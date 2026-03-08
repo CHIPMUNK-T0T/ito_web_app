@@ -1,12 +1,21 @@
 package auth
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 )
 
-var jwtSecret = []byte("your-secret-key") // 環境変数から読み込むべき
+// jwtSecret は環境変数 JWT_SECRET から読み込む
+func getJWTSecret() []byte {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		panic("JWT_SECRET 環境変数が設定されていません。起動前に設定してください。")
+	}
+	return []byte(secret)
+}
 
 type Claims struct {
 	UserID uint `json:"user_id"`
@@ -23,12 +32,12 @@ func GenerateToken(userID uint) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	return token.SignedString(getJWTSecret())
 }
 
 func ValidateToken(tokenString string) (uint, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
+		return getJWTSecret(), nil
 	})
 
 	if err != nil {

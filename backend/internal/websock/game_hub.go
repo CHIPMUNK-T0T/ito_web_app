@@ -6,13 +6,13 @@ import (
 )
 
 type GameHub struct {
-	Clients    map[*Client]bool
-	Register   chan *Client
-	Unregister chan *Client
-	Broadcast  chan []byte
-	Games      map[uint]*domain.Game
-	mu         sync.RWMutex
-	messageHandler GameMessageHandler
+	Clients        map[*Client]bool
+	Register       chan *Client
+	Unregister     chan *Client
+	Broadcast      chan []byte
+	Games          map[uint]*domain.Game
+	mu             sync.RWMutex
+	messageHandler *MessageHandler
 }
 
 func NewGameHub() *GameHub {
@@ -29,13 +29,18 @@ func (h *GameHub) Run() {
 	for {
 		select {
 		case client := <-h.Register:
+			h.mu.Lock()
 			h.Clients[client] = true
+			h.mu.Unlock()
 		case client := <-h.Unregister:
+			h.mu.Lock()
 			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
 				close(client.Send)
 			}
+			h.mu.Unlock()
 		case message := <-h.Broadcast:
+			h.mu.RLock()
 			for client := range h.Clients {
 				select {
 				case client.Send <- message:
@@ -44,6 +49,7 @@ func (h *GameHub) Run() {
 					delete(h.Clients, client)
 				}
 			}
+			h.mu.RUnlock()
 		}
 	}
 }
@@ -76,11 +82,14 @@ func (h *GameHub) SendToUser(userID uint, message []byte) {
 				close(client.Send)
 				delete(h.Clients, client)
 			}
-			return
 		}
 	}
 }
 
-func (h *GameHub) RegisterMessageHandler(handler GameMessageHandler) {
+func (h *GameHub) RegisterMessageHandler(handler *MessageHandler) {
 	h.messageHandler = handler
-} 
+}
+
+func (h *GameHub) MessageHandler() *MessageHandler {
+	return h.messageHandler
+}

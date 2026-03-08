@@ -119,8 +119,8 @@ func NewRoomRepository(db *gorm.DB, mock sqlmock.Sqlmock) repository.IRoomReposi
 	}
 }
 
-func (r *RoomRepository) Create(room domain.Room) error {
-	result := r.db.Create(&room)
+func (r *RoomRepository) Create(room *domain.Room) error {
+	result := r.db.Create(room)
 	if result.Error != nil {
 		return fmt.Errorf("failed to create room: %v", result.Error)
 	}

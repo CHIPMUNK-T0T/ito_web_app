@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"CHIPMUNK-T0T/ito_web_app/internal/entity/domain"
+	"CHIPMUNK-T0T/ito_web_app/internal/functional"
 	"CHIPMUNK-T0T/ito_web_app/internal/repository"
 	"CHIPMUNK-T0T/ito_web_app/test/mock"
 	"regexp"
@@ -46,8 +47,9 @@ func TestUserRepository(t *testing.T) {
 
 		repo := repository.NewUserRepository(db)
 
+		hashedPassword, _ := functional.Encrypt("password")
 		rows := sqlmock.NewRows([]string{"id", "username", "password", "created_at", "updated_at", "deleted_at"}).
-			AddRow(1, "testuser", "hashedpassword", time.Now(), time.Now(), nil)
+			AddRow(1, "testuser", string(hashedPassword), time.Now(), time.Now(), nil)
 
 		expectedSQL := regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")
 		mock.ExpectQuery(expectedSQL).
@@ -75,12 +77,13 @@ func TestUserRepository(t *testing.T) {
 
 		repo := repository.NewUserRepository(db)
 
+		hashedPassword, _ := functional.Encrypt("password")
 		rows := sqlmock.NewRows([]string{"id", "username", "password", "created_at", "updated_at", "deleted_at"}).
-			AddRow(1, "testuser", "hashedpassword", time.Now(), time.Now(), nil)
+			AddRow(1, "testuser", string(hashedPassword), time.Now(), time.Now(), nil)
 
-		expectedSQL := regexp.QuoteMeta("SELECT * FROM `users` WHERE (username = ? AND password = ?) AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")
+		expectedSQL := regexp.QuoteMeta("SELECT * FROM `users` WHERE username = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")
 		mock.ExpectQuery(expectedSQL).
-			WithArgs("testuser", "password", 1).
+			WithArgs("testuser", 1).
 			WillReturnRows(rows)
 
 		user, err := repo.FindByUserNameAndPassword("testuser", "password")

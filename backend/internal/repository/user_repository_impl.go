@@ -18,7 +18,7 @@ func NewUserRepository(db *gorm.DB) IUserRepository {
 	return &userRepository{db: db}
 }
 
-func (r *userRepository) Create(user domain.User) error {
+func (r *userRepository) Create(user *domain.User) error {
 	modelUser := &model.User{
 		Username: user.Username(),
 		Password: string(user.Password()),
@@ -27,6 +27,7 @@ func (r *userRepository) Create(user domain.User) error {
 	if result.Error != nil {
 		return fmt.Errorf("ユーザー作成エラー: %v", result.Error)
 	}
+	user.SetID(modelUser.ID)
 	return nil
 }
 
@@ -40,12 +41,26 @@ func (r *userRepository) FindByID(id uint) (domain.User, error) {
 }
 
 func (r *userRepository) FindByUserNameAndPassword(username string, password string) (domain.User, error) {
-	var modelUser model.User
-	result := r.db.Where("username = ? AND password = ?", username, password).First(&modelUser)
+	var modelUsers []model.User
+	// 同じ名前のユーザーをすべて取得する
+	result := r.db.Where("username = ?", username).Find(&modelUsers)
 	if result.Error != nil {
 		return domain.User{}, fmt.Errorf("ユーザー取得エラー: %v", result.Error)
 	}
-	return domain.NewUserWithID(modelUser.ID, modelUser.Username, functional.Hash(modelUser.Password)), nil
+
+	if len(modelUsers) == 0 {
+		return domain.User{}, fmt.Errorf("ユーザーが見つかりません")
+	}
+
+	// 取得した全ユーザーの中から、パスワードが一致する個体を探す
+	for _, u := range modelUsers {
+		storedHash := functional.Hash(u.Password)
+		if storedHash.Validate(password) {
+			return domain.NewUserWithID(u.ID, u.Username, storedHash), nil
+		}
+	}
+
+	return domain.User{}, fmt.Errorf("パスワードが一致しません")
 }
 
 func (r *userRepository) FindAll() ([]domain.User, error) {
@@ -63,7 +78,7 @@ func (r *userRepository) FindAll() ([]domain.User, error) {
 	return domainUsers, nil
 }
 
-func (r *userRepository) Update(user domain.User) error {
+func (r *userRepository) Update(user *domain.User) error {
 	var pastModel model.User
 	result := r.db.First(&pastModel, user.ID())
 	if result.Error != nil {
@@ -71,9 +86,9 @@ func (r *userRepository) Update(user domain.User) error {
 	}
 
 	modelUser := &model.User{
-		Model:      gorm.Model{ID: pastModel.ID, UpdatedAt: time.Now(), CreatedAt: pastModel.CreatedAt, DeletedAt: pastModel.DeletedAt},
-		Username:   user.Username(),
-		Password:   string(user.Password()),
+		Model:    gorm.Model{ID: pastModel.ID, UpdatedAt: time.Now(), CreatedAt: pastModel.CreatedAt, DeletedAt: pastModel.DeletedAt},
+		Username: user.Username(),
+		Password: string(user.Password()),
 	}
 	result = r.db.Save(modelUser)
 	if result.Error != nil {

@@ -1,0 +1,453 @@
+/* ============================================
+   SFC ドラクエ3風 レトロRPGスタイル
+   カラーパレット: SFCのDQ3に近い限定色
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+  /* 明るいレトロパレット: 水色・greenish */
+  --dq-black:    #0a1a14;       /* 背景黒 */
+  --dq-bg:       #0d2b22;       /* 背景: 深グリーン黒 */
+  --dq-win-bg:   #0a4060;       /* ウィンドウ: ティール・深水色 */
+  --dq-win-edge: #00c8d8;       /* ウィンドウ枠: 髦やかな水色 */
+  --dq-win-in:   #006888;       /* ウィンドウ内枠 */
+  --dq-white:    #e8fff8;       /* テキスト: 白緑系 */
+  --dq-yellow:   #d8ff40;       /* 強調: 黄緑・ライム */
+  --dq-cyan:     #40e8c8;       /* サブテキスト: ミント */
+  --dq-red:      #ff6040;       /* エラー */
+  --dq-green:    #40ff80;       /* 成功: フレッシュグリーン */
+  --dq-gray:     #80c0a8;       /* 無効・薄め */
+
+  /* タイル背景サイズ */
+  --tile: 8px;
+
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--dq-white);
+  background-color: var(--dq-bg);
+
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--dq-bg);
+  /* SFCっぽい暗いタイルパターン背景 */
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 7px,
+      rgba(0, 200, 150, 0.04) 8px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 7px,
+      rgba(0, 200, 150, 0.04) 8px
+    );
+  color: var(--dq-white);
+}
+
+main {
+  padding: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ============================================
+   DQ3風 ウィンドウ (.panel)
+   白の二重枠 + 濃紺背景
+   ============================================ */
+.panel {
+  background-color: var(--dq-win-bg);
+  /* 外枠（明るい青）→ 少し離れて内枠（暗め青）= 二重枠 */
+  border: 4px solid var(--dq-win-edge);
+  outline: 4px solid var(--dq-black);
+  outline-offset: -8px;
+  box-shadow:
+    0 0 0 4px var(--dq-win-edge),
+    inset 0 0 0 4px var(--dq-win-in),
+    4px 4px 0 0 rgba(0,0,0,0.8);
+  padding: 20px 16px 16px;
+  position: relative;
+  image-rendering: pixelated;
+}
+
+/* ウィンドウ内の二重枠ライン（::before で内側を描く） */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 2px solid var(--dq-win-edge);
+  pointer-events: none;
+}
+
+.panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================
+   見出し
+   ============================================ */
+h1, h2, h3 {
+  color: var(--dq-yellow);
+  font-family: 'Press Start 2P', monospace;
+  letter-spacing: 0.1em;
+  text-shadow: 2px 2px 0 var(--dq-black);
+  margin-bottom: 12px;
+}
+
+h1 { font-size: 14px; }
+h2 { font-size: 11px; }
+h3 { font-size: 10px; }
+
+p, span, label {
+  font-size: 10px;
+  line-height: 2;
+  font-family: 'Press Start 2P', monospace;
+}
+
+/* ============================================
+   NES.cssのボタンをDQ3風に上書き
+   ============================================ */
+.nes-btn {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 9px !important;
+  letter-spacing: 0.05em;
+  image-rendering: pixelated;
+  cursor: pointer;
+  padding: 10px 14px !important;
+  transition: filter 0.05s;
+}
+
+.nes-btn:not(:disabled):active {
+  filter: brightness(1.4);
+  transform: translate(2px, 2px);
+}
+
+/* プライマリボタン: DQ3の「はい」ボタン感 */
+.nes-btn.is-primary {
+  background-color: var(--dq-win-in) !important;
+  color: var(--dq-white) !important;
+  border-color: var(--dq-cyan) !important;
+}
+
+/* 警告ボタン: 黄色 */
+.nes-btn.is-warning {
+  background-color: #886000 !important;
+  color: var(--dq-yellow) !important;
+  border-color: var(--dq-yellow) !important;
+}
+
+/* エラーボタン */
+.nes-btn.is-error {
+  background-color: #700000 !important;
+  color: var(--dq-red) !important;
+  border-color: var(--dq-red) !important;
+}
+
+/* ============================================
+   入力フィールド DQ3風
+   ============================================ */
+.nes-input,
+.nes-textarea {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 10px !important;
+  background-color: var(--dq-black) !important;
+  color: var(--dq-white) !important;
+  border-color: var(--dq-cyan) !important;
+  caret-color: var(--dq-yellow);
+  outline: none;
+  padding: 8px !important;
+  width: 100%;
+}
+
+.nes-input:focus,
+.nes-textarea:focus {
+  border-color: var(--dq-yellow) !important;
+  box-shadow: 0 0 0 2px var(--dq-yellow) !important;
+}
+
+.nes-field label {
+  color: var(--dq-cyan) !important;
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* チェックボックス */
+.nes-checkbox + span {
+  color: var(--dq-white) !important;
+  font-size: 10px;
+}
+
+/* ============================================
+   テキストクラス
+   ============================================ */
+.small-mono {
+  font-size: 9px;
+  color: var(--dq-white);
+  font-family: 'Press Start 2P', monospace;
+  line-height: 2;
+}
+
+.highlight {
+  color: var(--dq-red) !important;
+}
+
+.dq-cyan {
+  color: var(--dq-cyan);
+}
+
+.dq-yellow {
+  color: var(--dq-yellow);
+}
+
+/* ============================================
+   カーソル（▶ マーク）
+   ============================================ */
+.dq-cursor::before {
+  content: '▶ ';
+  color: var(--dq-yellow);
+  animation: blink-cursor 0.8s step-end infinite;
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ============================================
+   ログボックス (ゲームのメッセージ窓)
+   ============================================ */
+.log-box {
+  background-color: var(--dq-black);
+  border: 3px solid var(--dq-cyan);
+  padding: 10px 12px;
+  max-height: 240px;
+  overflow-y: auto;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  color: var(--dq-white);
+  line-height: 2;
+  /* スクロールバーもレトロ風 */
+  scrollbar-width: thin;
+  scrollbar-color: var(--dq-cyan) var(--dq-black);
+}
+
+/* ============================================
+   カード表示 (手札の数字)
+   ============================================ */
+.card-display {
+  font-size: 40px;
+  text-align: center;
+  color: var(--dq-yellow);
+  text-shadow:
+    3px 3px 0 var(--dq-black),
+    -1px -1px 0 var(--dq-black);
+  letter-spacing: 0.1em;
+  padding: 12px 0;
+  font-family: 'Press Start 2P', monospace;
+}
+
+/* ============================================
+   プレイヤー行
+   ============================================ */
+.player-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--dq-win-in);
+  font-size: 9px;
+}
+
+.player-row:last-child {
+  border-bottom: none;
+}
+
+/* ============================================
+   ステータスバッジ
+   ============================================ */
+.status-pill {
+  padding: 2px 8px;
+  border: 2px solid currentColor;
+  font-size: 8px;
+  font-family: 'Press Start 2P', monospace;
+}
+
+.badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border: 2px solid var(--dq-cyan);
+  color: var(--dq-cyan);
+  font-size: 8px;
+  font-family: 'Press Start 2P', monospace;
+}
+
+/* ============================================
+   レイアウトヘルパー
+   ============================================ */
+.split-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.create-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+/* ============================================
+   セクション・グリッド
+   ============================================ */
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.rooms-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rooms-grid-top {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.panel--slim {
+  padding: 14px 12px;
+}
+
+.panel--stretch {
+  flex: 1 1 280px;
+}
+
+.rooms-list-panel {
+  min-height: 240px;
+}
+
+/* ============================================
+   ヘッダーエリア
+   ============================================ */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--dq-win-in);
+}
+
+.logout-btn {
+  white-space: nowrap;
+}
+
+/* ============================================
+   ゲームカード固定 (vote-card)
+   ============================================ */
+.vote-card {
+  margin-top: 12px;
+  border: 2px dashed var(--dq-cyan);
+  padding: 10px;
+  background-color: rgba(0,0,70,0.6);
+}
+
+/* ============================================
+   ゲームのステータス「戦闘画面」風
+   ============================================ */
+.retro-screen {
+  background-color: var(--dq-black);
+  border: 4px solid var(--dq-win-edge);
+  padding: 12px;
+  position: relative;
+}
+
+.retro-screen::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 2px solid var(--dq-win-in);
+  pointer-events: none;
+}
+
+/* ============================================
+   タイトル装飾（点滅テキスト）
+   ============================================ */
+.blink-text {
+  animation: blink-text 1s step-end infinite;
+  color: var(--dq-yellow);
+}
+
+@keyframes blink-text {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ============================================
+   レスポンシブ
+   ============================================ */
+@media (max-width: 900px) {
+  .rooms-grid-top {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    font-size: 9px;
+  }
+
+  .card-display {
+    font-size: 28px;
+  }
+
+  main {
+    padding: 8px;
+  }
+}
+
+/* ============================================
+   NES.css の不要エフェクトを上書きしてリセット
+   ============================================ */
+.nes-container {
+  background-color: var(--dq-win-bg) !important;
+  color: var(--dq-white) !important;
+}
+
+/* スクロールバー全体 */
+::-webkit-scrollbar {
+  width: 6px;
+  background: var(--dq-black);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--dq-cyan);
+}

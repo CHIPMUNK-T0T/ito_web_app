@@ -5,20 +5,30 @@ import (
 	"CHIPMUNK-T0T/ito_web_app/internal/entity/model"
 	"CHIPMUNK-T0T/ito_web_app/internal/functional"
 	"fmt"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
 )
 
+var (
+	roomPlayersMap = make(map[uint][]domain.RoomPlayer)
+	playersMu      sync.RWMutex
+)
+
 type roomRepository struct {
-	db *gorm.DB
+	db       *gorm.DB
+	userRepo IUserRepository
 }
 
 func NewRoomRepository(db *gorm.DB) IRoomRepository {
-	return &roomRepository{db: db}
+	return &roomRepository{
+		db:       db,
+		userRepo: NewUserRepository(db),
+	}
 }
 
-func (r *roomRepository) Create(room domain.Room) error {
+func (r *roomRepository) Create(room *domain.Room) error {
 	modelRoom := &model.Room{
 		Name:        room.Name(),
 		Password:    string(room.Password()),
@@ -31,6 +41,17 @@ func (r *roomRepository) Create(room domain.Room) error {
 	if result.Error != nil {
 		return fmt.Errorf("ルーム作成エラー: %v", result.Error)
 	}
+	room.SetID(modelRoom.ID)
+
+	playersMu.Lock()
+	players := room.GetPlayers()
+	saved := make([]domain.RoomPlayer, len(players))
+	for i, p := range players {
+		saved[i] = *p
+	}
+	roomPlayersMap[modelRoom.ID] = saved
+	playersMu.Unlock()
+
 	return nil
 }
 
@@ -42,6 +63,13 @@ func (r *roomRepository) FindByID(id uint) (domain.Room, error) {
 	}
 
 	room := domain.NewRoomWithID(modelRoom.ID, modelRoom.Name, functional.Hash(modelRoom.Password), modelRoom.MaxPlayers, modelRoom.CreatorID, modelRoom.Description, modelRoom.IsPrivate)
+
+	playersMu.RLock()
+	if savedPlayers, ok := roomPlayersMap[modelRoom.ID]; ok {
+		room.LoadPlayers(savedPlayers)
+	}
+	playersMu.RUnlock()
+
 	return room, nil
 }
 
@@ -53,6 +81,13 @@ func (r *roomRepository) FindByRoomNameAndPassword(name string, password string)
 	}
 
 	room := domain.NewRoomWithID(modelRoom.ID, modelRoom.Name, functional.Hash(modelRoom.Password), modelRoom.MaxPlayers, modelRoom.CreatorID, modelRoom.Description, modelRoom.IsPrivate)
+
+	playersMu.RLock()
+	if savedPlayers, ok := roomPlayersMap[modelRoom.ID]; ok {
+		room.LoadPlayers(savedPlayers)
+	}
+	playersMu.RUnlock()
+
 	return room, nil
 }
 
@@ -64,14 +99,19 @@ func (r *roomRepository) FindAll() ([]domain.Room, error) {
 	}
 
 	domainRooms := make([]domain.Room, 0, len(modelRooms))
+	playersMu.RLock()
 	for _, modelRoom := range modelRooms {
 		room := domain.NewRoomWithID(modelRoom.ID, modelRoom.Name, functional.Hash(modelRoom.Password), modelRoom.MaxPlayers, modelRoom.CreatorID, modelRoom.Description, modelRoom.IsPrivate)
+		if savedPlayers, ok := roomPlayersMap[modelRoom.ID]; ok {
+			room.LoadPlayers(savedPlayers)
+		}
 		domainRooms = append(domainRooms, room)
 	}
+	playersMu.RUnlock()
 	return domainRooms, nil
 }
 
-func (r *roomRepository) Update(room domain.Room) error {
+func (r *roomRepository) Update(room *domain.Room) error {
 	var pastModel model.Room
 	result := r.db.First(&pastModel, room.ID())
 	if result.Error != nil {
@@ -88,43 +128,50 @@ func (r *roomRepository) Update(room domain.Room) error {
 		IsPrivate:   room.IsPrivate(),
 	}
 
-	// トランザクション開始
 	tx := r.db.Begin()
 	if tx.Error != nil {
 		return fmt.Errorf("トランザクション開始エラー: %v", tx.Error)
 	}
 
-	// ルーム情報を更新
 	if err := tx.Save(modelRoom).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("ルーム更新エラー: %v", err)
 	}
 
-	// トランザクションをコミット
 	if err := tx.Commit().Error; err != nil {
 		return fmt.Errorf("トランザクションコミットエラー: %v", err)
 	}
+
+	playersMu.Lock()
+	players := room.GetPlayers()
+	saved := make([]domain.RoomPlayer, len(players))
+	for i, p := range players {
+		saved[i] = *p
+	}
+	roomPlayersMap[room.ID()] = saved
+	playersMu.Unlock()
 
 	return nil
 }
 
 func (r *roomRepository) Delete(id uint) error {
-	// トランザクション開始
 	tx := r.db.Begin()
 	if tx.Error != nil {
 		return fmt.Errorf("トランザクション開始エラー: %v", tx.Error)
 	}
 
-	// ルームを削除
 	if err := tx.Delete(&model.Room{}, id).Error; err != nil {
 		tx.Rollback()
 		return fmt.Errorf("ルーム削除エラー: %v", err)
 	}
 
-	// トランザクションをコミット
 	if err := tx.Commit().Error; err != nil {
 		return fmt.Errorf("トランザクションコミットエラー: %v", err)
 	}
+
+	playersMu.Lock()
+	delete(roomPlayersMap, id)
+	playersMu.Unlock()
 
 	return nil
 }

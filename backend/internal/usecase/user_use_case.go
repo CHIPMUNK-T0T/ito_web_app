@@ -31,7 +31,7 @@ func (uc *UserUseCase) Register(username, password string) (*domain.User, error)
 		return nil, err
 	}
 
-	err = uc.userRepo.Create(user)
+	err = uc.userRepo.Create(&user)
 	if err != nil {
 		return nil, err
 	}
@@ -46,4 +46,12 @@ func (uc *UserUseCase) Login(username, password string) (*domain.User, error) {
 	}
 
 	return &user, nil
-} 
+}
+
+func (uc *UserUseCase) GetUserByID(id uint) (*domain.User, error) {
+	user, err := uc.userRepo.FindByID(id)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}

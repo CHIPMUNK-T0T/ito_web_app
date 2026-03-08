@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -26,9 +27,12 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		userID, err := auth.ValidateToken(parts[1])
 		if err != nil {
+			log.Printf("[Auth] Token validation failed: %v", err)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "無効なトークンです"})
 			return
 		}
+
+		log.Printf("[Auth] Token validated. Path: %s, UserID: %d", c.Request.URL.Path, userID)
 
 		// 検証済みのユーザーIDをコンテキストに保存
 		c.Set("user_id", userID)
@@ -36,7 +40,46 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-func validateToken(token string) (uint, error) {
-	// TODO: JWTの検証処理を実装
-	return 0, nil
-} 
+// AuthMiddlewareWS はWebSocket接続用の認証ミドルウェア。
+// ブラウザのWebSocket APIはAuthorizationヘッダーを送れないため、
+// クエリパラメータ ?token=<jwt> からトークンを読み取る。
+// ヘッダーが存在する場合はAuthMiddlewareと同様にそちらを優先する。
+func AuthMiddlewareWS() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenStr := ""
+
+		// 1. まずAuthorizationヘッダーを確認（通常HTTPリクエストとの互換性）
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				tokenStr = parts[1]
+			}
+		}
+
+		// 2. ヘッダーがなければクエリパラメータ ?token= を確認
+		if tokenStr == "" {
+			tokenStr = c.Query("token")
+		}
+
+		log.Printf("[AuthWS] Incoming request to %s with token: %s", c.Request.URL.Path, tokenStr)
+
+		if tokenStr == "" {
+			log.Printf("[AuthWS] No token found")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "認証が必要です"})
+			return
+		}
+
+		userID, err := auth.ValidateToken(tokenStr)
+		if err != nil {
+			log.Printf("[AuthWS] Token validation failed: %v", err)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "無効なトークンです"})
+			return
+		}
+
+		log.Printf("[AuthWS] Token validated. UserID: %d", userID)
+
+		c.Set("user_id", userID)
+		c.Next()
+	}
+}

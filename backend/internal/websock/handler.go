@@ -7,8 +7,8 @@ import (
 
 // GameMessageHandler は、ゲームのメッセージ処理を行うインターフェース
 type GameMessageHandler interface {
-	HandleVoteSubmit(userID uint, roomID uint, payload VoteSubmitPayload) error
-	// 他のメッセージハンドリングメソッドを追加
+	HandleChatMessage(userID uint, roomID uint, payload ChatPayload) error
+	HandlePlayCard(userID uint, roomID uint, payload PlayCardPayload) error
 }
 
 type MessageHandler struct {
@@ -21,6 +21,10 @@ func NewMessageHandler(gameHandler GameMessageHandler) *MessageHandler {
 	}
 }
 
+func (h *MessageHandler) HandlePlayCard(userID uint, roomID uint, payload PlayCardPayload) error {
+	return h.gameHandler.HandlePlayCard(userID, roomID, payload)
+}
+
 func (h *MessageHandler) HandleMessage(client *Client, messageBytes []byte) error {
 	var message Message
 	if err := json.Unmarshal(messageBytes, &message); err != nil {
@@ -28,14 +32,21 @@ func (h *MessageHandler) HandleMessage(client *Client, messageBytes []byte) erro
 	}
 
 	switch message.Type {
-	case MessageTypeVoteSubmit:
-		var payload VoteSubmitPayload
+	case MessageTypePlayCard:
+		var payload PlayCardPayload
 		if err := json.Unmarshal(message.Payload, &payload); err != nil {
 			return err
 		}
-		return h.gameHandler.HandleVoteSubmit(client.UserID, client.RoomID, payload)
+		return h.gameHandler.HandlePlayCard(client.UserID, client.RoomID, payload)
+	case MessageTypeChat:
+		var payload ChatPayload
+		if err := json.Unmarshal(message.Payload, &payload); err != nil {
+			return err
+		}
+		return h.gameHandler.HandleChatMessage(client.UserID, client.RoomID, payload)
+
 	default:
 		log.Printf("Unknown message type: %s", message.Type)
 		return nil
 	}
-} 
+}

@@ -27,7 +27,7 @@ func TestRoomRepository(t *testing.T) {
 			WillReturnResult(sqlmock.NewResult(1, 1))
 		mock.ExpectCommit()
 
-		err = repo.Create(room)
+		err = repo.Create(&room)
 		if err != nil {
 			t.Errorf("予期しないエラー: %v", err)
 		}

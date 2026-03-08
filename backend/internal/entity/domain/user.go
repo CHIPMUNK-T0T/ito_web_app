@@ -31,15 +31,19 @@ func NewUserWithID(id uint, username string, passwordHash functional.Hash) User 
 }
 
 // Getters
-func (u *User) ID() uint {
+func (u User) ID() uint {
 	return u.id
 }
 
-func (u *User) Username() string {
+func (u *User) SetID(id uint) {
+	u.id = id
+}
+
+func (u User) Username() string {
 	return u.username
 }
 
-func (u *User) Password() functional.Hash {
+func (u User) Password() functional.Hash {
 	return u.password
 }
 
